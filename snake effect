@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bộ Xương Rồng có Cánh và Chân</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #1a1a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  canvas {
+    border: 1px solid #444;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="skeletonCanvas"></canvas>
+
+<script>
+  const canvas = document.getElementById('skeletonCanvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = window.innerWidth * 0.95;
+  canvas.height = window.innerHeight * 0.95;
+
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = event.clientX - rect.left;
+    mouse.y = event.clientY - rect.top;
+  });
+
+  const numSegments = 30;
+  const baseSegmentLength = 25;
+  const skullSize = 30;
+
+  const skullSegments = 1;
+  const neckSegments = 5;
+  const torsoSegments = 10;
+
+  let segments = [];
+
+  const boneColors = {
+    bone: 'rgba(240, 240, 230, 0.9)',
+    outline: 'rgba(100, 100, 90, 0.7)',
+    eyeSocket: 'rgba(0,0,0,0.6)'
+  };
+
+  for (let i = 0; i < numSegments; i++) {
+    let segmentWidth;
+    if (i < skullSegments) {
+        segmentWidth = skullSize;
+    } else if (i < skullSegments + neckSegments) {
+        segmentWidth = skullSize * 0.4 + (skullSize * 0.2 * (i - skullSegments) / neckSegments);
+    } else if (i < skullSegments + neckSegments + torsoSegments) {
+        segmentWidth = skullSize * 0.7;
+    } else {
+        const tailProgress = (i - skullSegments - neckSegments - torsoSegments) / (numSegments - skullSegments - neckSegments - torsoSegments);
+        segmentWidth = skullSize * 0.6 * (1 - tailProgress * 0.9) + 3;
+    }
+
+    segments.push({
+      x: canvas.width / 2 - i * baseSegmentLength * 0.6,
+      y: canvas.height / 2,
+      angle: 0,
+      width: Math.max(3, segmentWidth)
+    });
+  }
+
+  function updateSegments() {
+    let targetX = mouse.x;
+    let targetY = mouse.y;
+
+    let dx = targetX - segments[0].x;
+    let dy = targetY - segments[0].y;
+    segments[0].angle = Math.atan2(dy, dx);
+    segments[0].x += dx * 0.1;
+    segments[0].y += dy * 0.1;
+
+    for (let i = 1; i < numSegments; i++) {
+      targetX = segments[i-1].x;
+      targetY = segments[i-1].y;
+
+      dx = targetX - segments[i].x;
+      dy = targetY - segments[i].y;
+      segments[i].angle = Math.atan2(dy, dx);
+
+      const desiredDist = baseSegmentLength * 0.8;
+      segments[i].x = segments[i-1].x - Math.cos(segments[i].angle) * desiredDist;
+      segments[i].y = segments[i-1].y - Math.sin(segments[i].angle) * desiredDist;
+    }
+  }
+
+  function drawSkeleton() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = numSegments - 1; i >= 0; i--) {
+      const segment = segments[i];
+      ctx.save();
+      ctx.translate(segment.x, segment.y);
+      ctx.rotate(segment.angle);
+
+      if (i === 0) { 
+        drawSkull(segment.width);
+      } else {
+        drawVertebra(segment.width, baseSegmentLength);
+        if (i >= skullSegments + neckSegments && i < skullSegments + neckSegments + torsoSegments) {
+            drawRibs(segment.width, baseSegmentLength);
+        }
+      }
+      ctx.restore();
+    }
+
+    drawDragonWingsAndLegs();
+  }
+
+  function drawSkull(size) {
+    ctx.fillStyle = boneColors.bone;
+    ctx.strokeStyle = boneColors.outline;
+    ctx.lineWidth = 1.5;
+
+    ctx.beginPath();
+    ctx.ellipse(size * 0.1, 0, size * 0.8, size * 0.5, 0, Math.PI * 1.1, Math.PI * -0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(size * 0.4, size * 0.35);
+    ctx.quadraticCurveTo(size * 0.8, size * 0.4, size * 0.9, size * 0.2);
+    ctx.lineTo(size * 0.95, 0);
+    ctx.quadraticCurveTo(size * 0.8, -size * 0.05, size * 0.4, 0);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = boneColors.eyeSocket;
+    ctx.beginPath();
+    ctx.ellipse(size * 0.4, -size * 0.05, size * 0.25, size * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = boneColors.eyeSocket;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.85, -size*0.05);
+    ctx.lineTo(size * 0.95, -size*0.1);
+    ctx.lineTo(size * 0.9, size*0.05);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawVertebra(width, length) {
+    ctx.fillStyle = boneColors.bone;
+    ctx.strokeStyle = boneColors.outline;
+    ctx.lineWidth = 1;
+
+    const coreHeight = width * 0.7;
+    const coreWidth = length * 0.4;
+
+    ctx.beginPath();
+    ctx.roundRect(-coreWidth * 0.7, -coreHeight * 0.5, coreWidth * 1.4, coreHeight, coreHeight * 0.3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, -coreHeight * 0.4);
+    ctx.lineTo(length * 0.1, -coreHeight * 0.8);
+    ctx.lineTo(length * 0.2, -coreHeight * 0.3);
+    ctx.fill();
+  }
+
+  function drawRibs(vertebraWidth, vertebraLength) {
+    ctx.strokeStyle = boneColors.bone;
+    ctx.lineWidth = Math.max(1, vertebraWidth * 0.1);
+
+    const ribOriginY = vertebraWidth * 0.1;
+    const ribLength = vertebraWidth * 1.8;
+    const ribCurvature = vertebraWidth * 1.5;
+
+    ctx.beginPath();
+    ctx.moveTo(0, ribOriginY);
+    ctx.quadraticCurveTo(vertebraLength * 0.3, ribOriginY + ribCurvature, 0, ribOriginY + ribLength);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, -ribOriginY);
+    ctx.quadraticCurveTo(vertebraLength * 0.3, -ribOriginY - ribCurvature, 0, -ribOriginY - ribLength);
+    ctx.stroke();
+  }
+
+  function drawDragonWingsAndLegs() {
+    // Vẽ cánh rồng
+    ctx.strokeStyle = 'rgba(200, 200, 255, 0.5)';
+    ctx.fillStyle = 'rgba(100, 100, 255, 0.2)';
+    ctx.lineWidth = 1;
+
+    const wingSpan = 200;
+    const wingHeight = 120;
+
+    // Cánh bên phải
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(wingSpan, -wingHeight);
+    ctx.lineTo(wingSpan * 0.8, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Cánh bên trái
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-wingSpan, -wingHeight);
+    ctx.lineTo(-wingSpan * 0.8, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Vẽ chân giống con rết
+    const numLegs = 20;
+    for (let i = 0; i < numLegs; i++) {
+        const angle = (Math.PI * 2) * (i / numLegs);
+        const legX = Math.cos(angle) * (i * 7 + 30);
+        const legY = Math.sin(angle) * (i * 7 + 30);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(legX, legY);
+        ctx.stroke();
+    }
+  }
+
+  let lastTime = 0;
+  const fps = 30;
+  const frameInterval = 1000 / fps;
+
+  function gameLoop(currentTime) {
+    requestAnimationFrame(gameLoop);
+    const deltaTime = currentTime - lastTime;
+
+    if (deltaTime > frameInterval) {
+        lastTime = currentTime - (deltaTime % frameInterval);
+        updateSegments();
+        drawSkeleton();
+    }
+  }
+
+  requestAnimationFrame(gameLoop);
+
+  window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth * 0.95;
+    canvas.height = window.innerHeight * 0.95;
+  });
+
+</script>
+
+</body>
+</html>
